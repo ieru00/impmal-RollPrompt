@@ -1,5 +1,3 @@
-console.log('DIALOG VALIDATION | TGMKOLL I SEE YOU THERE!');
-
 const difficulties = [
   { name: "Challenging", value: 0, special_name: "challenging" },
   { name: "Routine", value: 20, special_name: "routine" },
