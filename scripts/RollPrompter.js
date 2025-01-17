@@ -36,7 +36,7 @@ function createSkillSelectionDialog(actor) {
   const difficultyOptions = difficulties.map(diff => `<option value="${diff.value}">${diff.name} ${diff.value > 0 ? `+${diff.value}` : `${diff.value}`}</option>`).join("");
 
   new Dialog({
-    title: `Select Skill, Difficulty, and SL for ${actorName}`,
+    title: `Select Skill for ${actorName}`,
     content: `
       <form>
         <div class="form-group" style="text-align: center; width: 80px; height: 80px; margin: 0 auto;">
