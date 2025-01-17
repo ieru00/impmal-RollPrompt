@@ -50,7 +50,7 @@ function createSkillSelectionDialog(actor) {
 
   // Create a dialog for this token with both dropdowns and checkbox
   new Dialog({
-    title: `Select Skill for ${actorName}`,
+    title: `Select Skill and Difficulty for ${actorName}`,
     content: `
       <form>
         <div class="form-group" style="text-align: center; width: 80px; height: 80px; margin: 0 auto;">
@@ -97,12 +97,13 @@ function createSkillSelectionDialog(actor) {
               key: selectedSkillObj?.parentSkill || selectedSkill
           };
 
-          // Create the optionSetup object with the special name
+          // Create the optionSetup object with the special name and rollMode
           let optionSetup = {
             title: {},
             fields: {
               difficulty: selectedSpecialName
-            }
+            },
+            rollMode: isPrivate ? "gmroll" : "publicroll"
           };
           console.log(optionSetup); // Output the optionSetup object for debugging
 
@@ -139,11 +140,13 @@ function createSkillSelectionDialog(actor) {
               content: content
             });
           }
+
+          ui.notifications.info("Skill test initiated!");
         }
       },
       cancel: {
         label: "Cancel",
-        callback: () => { ui.notifications.info("Roll Prompt Cancelled!"); }
+        callback: () => { ui.notifications.info("Cancelled!"); }
       }
     },
     default: "confirm"
@@ -205,17 +208,20 @@ Hooks.on('renderChatMessage', (message, html, data) => {
         key: skillKey
       };
 
-      // Create the optionSetup object with the special name
+      // Create the optionSetup object with the special name and rollMode
       let optionSetup = {
         title: {},
         fields: {
-          difficulty: difficulties.find(diff => diff.value == difficulty).special_name
-        }
+          difficulty: difficulties.find(diff => diff.value == difficulty).special_name,
+          rollMode: isPrivate ? "gmroll" : "publicroll"
+        },
+        
       };
 
       // Perform the skill test with the selected skill, difficulty, and privacy setting
       if (actor.isOwner || game.user.isGM) {
         await actor.setupSkillTest(skillSetup, optionSetup, true);
+        ui.notifications.info("Skill test initiated!");
       } else {
         ui.notifications.warn("You do not have permission to perform this action.");
       }
