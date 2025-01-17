@@ -28,6 +28,6 @@
         "styles/RollPrompter.css"
       ],
     "download": "https://github.com/ieru00/impmal-RollPrompt/raw/refs/heads/main/zipped/RollPrompter.zip",
-    "manifest": "https://raw.githubusercontent.com/ieru00/impmal-RollPrompt/main/module.json"
+    "manifest": "https://raw.githubusercontent.com/ieru00/impmal-RollPrompt/refs/heads/main/module.json"
   }
   
