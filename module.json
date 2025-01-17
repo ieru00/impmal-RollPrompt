@@ -27,7 +27,7 @@
     "styles": [
         "styles/RollPrompter.css"
       ],
-    "manifest": "https://github.com/ieru00/impmal-RollPrompt",
+    "manifest": "https://github.com/ieru00/impmal-RollPrompt/blob/main/zipped/RollPrompter.zip",
     "module": "https://github.com/ieru00/impmal-RollPrompt/blob/main/module.json"
   }
   
