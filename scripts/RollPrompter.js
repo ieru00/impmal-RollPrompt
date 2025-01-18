@@ -205,7 +205,7 @@ Hooks.on('renderChatMessage', (message, html, data) => {
         fields: {
           difficulty: difficulties.find(diff => diff.value == difficulty)?.special_name || "unknown",
           rollMode: isPrivate ? "gmroll" : "publicroll",
-          SL: Number(successLevel) || undefined
+          SL: isNaN(Number(successLevel)) ? 0 : Number(successLevel)
         },
       };
 
