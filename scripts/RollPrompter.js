@@ -154,33 +154,149 @@ function createSkillSelectionDialog(actor) {
   }).render(true);
 }
 
+// Start Prompt Dialog
+
 Hooks.on('renderSceneControls', (controls, html) => {
   if (!game.user.isGM) return;
 
-  const button = $(`<li class="control-tool" title="Send Skill Test Message">
+  const button = $(`<li class="control-tool" title="Open Custom Dialog">
     <i class="fas fa-dice"></i>
   </li>`);
 
-  button.click(() => {
-    if (canvas.tokens.controlled.length === 0) {
-      ui.notifications.warn("No token selected. Please select a token to proceed.");
-      return;
-    }
+  let showAllActors = localStorage.getItem('showAllActors') === 'true';
+  let dialogInstance = null;
 
-    for (const token of canvas.tokens.controlled) {
-      const actor = token.actor;
+  const createDialogContent = (showAllActors) => {
+    const playerActors = canvas.tokens.placeables.filter(token => token.actor && token.actor.hasPlayerOwner);
+    let dialogContent = `
+      <div style="display: flex; justify-content: flex-start; align-items: center; margin-bottom: 10px;">
+        <button id="toggleButton" style="padding: 5px 10px; margin-right: 10px;">${showAllActors ? "Roll for All" : "Show Tokens"}</button>
+      </div>
+      <form style="display: flex; flex-wrap: wrap; overflow-x: auto; max-width: 100%;">`;
 
-      if (!actor) {
-        ui.notifications.warn("Selected token does not have an actor.");
-        continue;
+    if (showAllActors) {
+      for (const token of playerActors) {
+        const actor = token.actor;
+        const tokenImg = actor.img;
+        dialogContent += `
+          <div style="flex: 1 1 200px; margin: 10px; border: 1px solid #ccc; padding: 10px; box-sizing: border-box;">
+            ${tokenImg ? `<img src="${tokenImg}" alt="${actor.name}" style="width: 50px; height: 50px; display: block; margin: 0 auto;">` : ''}
+            <label>${actor.name}</label>
+            <div style="margin-bottom: 10px;">
+              <label for="skills-${actor.id}">Skills:</label>
+              <select name="skills-${actor.id}"></select>
+            </div>
+            <div style="margin-bottom: 10px;">
+              <label for="difficulty-${actor.id}">Difficulty:</label>
+              <select name="difficulty-${actor.id}"></select>
+            </div>
+            <div style="margin-bottom: 10px;">
+              <label>isPrivate?</label>
+              <input type="checkbox" name="isPrivate-${actor.id}">
+            </div>
+            <div style="margin-bottom: 10px;">
+              <label for="successLevel-${actor.id}">Success Level:</label>
+              <input type="number" name="successLevel-${actor.id}" style="width: 60px;" min="-9" max="99">
+              <button type="button" name="roll-${actor.id}" style="margin-top: 3px;">Roll</button>
+            </div>
+          </div>`;
       }
-
-      createSkillSelectionDialog(actor);
+    } else {
+      dialogContent += `
+        <div style="flex: 1 1 100%; margin: 10px; border: 1px solid #ccc; padding: 10px; box-sizing: border-box;">
+          <label>Roll All!</label>
+          <div style="margin-bottom: 10px;">
+            <label for="skills-all">Skills:</label>
+            <select name="skills-all"></select>
+          </div>
+          <div style="margin-bottom: 10px;">
+            <label for="difficulty-all">Difficulty:</label>
+            <select name="difficulty-all"></select>
+          </div>
+          <div style="margin-bottom: 10px;">
+            <label>isPrivate?</label>
+            <input type="checkbox" name="isPrivate-all">
+          </div>
+          <div style="margin-bottom: 10px;">
+            <label for="successLevel-all">Success Level:</label>
+            <input type="number" name="successLevel-all" style="width: 60px;" min="-9" max="99">
+          </div>
+        </div>`;
     }
+    dialogContent += '</form>';
+    return dialogContent;
+  };
+
+  const createDialog = () => {
+    if (dialogInstance) {
+      console.log("Reusing existing dialog instance");
+      const dialogContent = createDialogContent(showAllActors);
+      dialogInstance.data.content = dialogContent;
+      dialogInstance.render(true);
+    } else {
+      const dialogContent = createDialogContent(showAllActors);
+
+      dialogInstance = new Dialog({
+        title: "Custom Dialog",
+        content: dialogContent,
+        buttons: {
+          promptAll: {
+            label: "Prompt All!",
+            callback: (html) => {
+              const formData = new FormData(html[0].querySelector("form"));
+              console.log("Form Data:", formData);
+            }
+          },
+          close: {
+            label: "Close",
+            callback: (html) => {
+              dialogInstance = null;
+            }
+          }
+        },
+        default: "promptAll",
+        render: (html) => {
+          console.log("Dialog rendered");
+          html.closest('.dialog').css({
+            'width': 'auto',
+            'height': 'auto',
+            'max-width': '100%',
+            'max-height': '100vh',
+            'overflow': 'auto',
+            'display': 'block'
+          });
+
+          html.css({
+            'width': 'auto',
+            'height': 'auto',
+            'max-width': '100%',
+            'max-height': '100vh',
+            'overflow': 'auto',
+          });
+
+          $('#toggleButton').click(function() {
+            showAllActors = !showAllActors;
+            localStorage.setItem('showAllActors', showAllActors);
+            console.log("Toggle button clicked, showAllActors:", showAllActors);
+            createDialog();
+          });
+        }
+      });
+
+      dialogInstance.render(true);
+    }
+  };
+
+  button.click(() => {
+    console.log("Button clicked, dialogInstance:", dialogInstance);
+    createDialog();
   });
 
   html.find('.main-controls').append(button);
 });
+
+
+//End Prompt Dialog
 
 Hooks.on('renderChatMessage', (message, html, data) => {
   html.find('.roll-skill-test').click(async (ev) => {
