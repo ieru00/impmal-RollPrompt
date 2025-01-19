@@ -1,9 +1,41 @@
-input[type=number]::-webkit-inner-spin-button, 
-input[type=number]::-webkit-outer-spin-button { 
-  -webkit-appearance: auto; 
-  margin: 0; 
+.chat-card {
+  border: 1px solid #999;
+  border-radius: 4px;
+  margin-bottom: 5px;
+  padding: 5px;
 }
+
+.card-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 5px;
+}
+
+.card-header img {
+  margin-right: 10px;
+  border-radius: 4px;
+}
+
+.card-content {
+  padding: 5px;
+}
+
 .resizable-dialog {
+  min-width: 300px;
+  min-height: 200px;
   resize: both;
   overflow: auto;
+}
+
+.roll-button {
+  background: rgba(0, 0, 0, 0.1);
+  border: 1px solid #999;
+  border-radius: 3px;
+  padding: 3px 5px;
+  margin: 2px 0;
+  cursor: pointer;
+}
+
+.roll-button:hover {
+  background: rgba(0, 0, 0, 0.2);
 }

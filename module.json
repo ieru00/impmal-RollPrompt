@@ -7,7 +7,7 @@
         "name": "ieru00"
       }
     ],
-    "version": "0.1.5",
+    "version": "0.1.6",
     "minimumCoreVersion": "12",
     "compatibleCoreVersion": "12",
     "compatibility": {
@@ -15,7 +15,12 @@
       "verified": "12"
     },
     "scripts": [
-        "scripts/RollPrompter.js"
+        "scripts/RollPrompter.js",
+        "scripts/rp_config.js",
+        "scripts/rp_utils.js",
+        "scripts/rp_skills.js",
+        "scripts/rp_chat.js",
+        "scripts/rp_dialog.js"
       ],
     "languages": [
         {
