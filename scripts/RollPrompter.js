@@ -174,7 +174,7 @@ const RollPrompter = {
               </div>
               <select name="skills-all" style="width: 100%;">
                 <option value="" disabled selected>(>',')>Select Skill<(','<)</option>
-                ${Object.values(allSkills)
+                ${Object.keys(allSkills)
                   .map((skill) => `<option value="${skill}">${skill}</option>`)
                   .join("")}
               </select>
@@ -405,14 +405,29 @@ Hooks.on("renderChatMessage", (message, html, data) => {
 
     if (userIsGM || userIsOwner) {
       const actor = game.actors.get(actorId);
+      const allSkills = game.impmal.config.skills;
       const skills = RollPrompter.createSkillSelectionDialog(actor);
-      const selectedSkill = skills.find((s) => s.name === skill);
-
-      const skillSetup = {
-        itemId: selectedSkill?.id || undefined,
-        name: undefined,
-        key: selectedSkill?.parentSkill || selectedSkill?.name,
-      };
+      
+      // First check if it's a skill from the Prompt All section
+      const isPromptAllSkill = Object.values(allSkills).includes(skill);
+      
+      let skillSetup;
+      
+      if (isPromptAllSkill) {
+        skillSetup = {
+          itemId: undefined,
+          name: undefined,
+          key: skill
+        };
+      } else {
+        // Handle individual skills as before
+        const selectedSkill = skills.find((s) => s.name === skill);
+        skillSetup = {
+          itemId: selectedSkill?.id || undefined,
+          name: undefined,
+          key: selectedSkill?.parentSkill || selectedSkill?.name,
+        };
+      }
 
       const optionSetup = {
         title: {},
