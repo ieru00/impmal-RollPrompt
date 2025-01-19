@@ -7,11 +7,7 @@
         "name": "ieru00"
       }
     ],
-<<<<<<< HEAD
     "version": "0.1.5",
-=======
-    "version": "0.1.4",
->>>>>>> main
     "minimumCoreVersion": "12",
     "compatibleCoreVersion": "12",
     "compatibility": {
