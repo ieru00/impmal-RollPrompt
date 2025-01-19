@@ -1,13 +1,13 @@
 {
     "id": "RollPrompter",
     "title": "Imperium Maledictum - RollPrompter",
-    "description": "Module that will allow you to prompt highlighted token owners for rolls based on your request.",
+    "description": "Module that will bring up a dialog window which allows you to select skills to prompt your players to roll through chat!",
     "authors": [
       {
         "name": "ieru00"
       }
     ],
-    "version": "0.1.3",
+    "version": "0.1.5",
     "minimumCoreVersion": "12",
     "compatibleCoreVersion": "12",
     "compatibility": {
