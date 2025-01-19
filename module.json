@@ -7,7 +7,7 @@
         "name": "ieru00"
       }
     ],
-    "version": "0.1.5",
+    "version": "0.1.6",
     "minimumCoreVersion": "12",
     "compatibleCoreVersion": "12",
     "compatibility": {
@@ -15,8 +15,8 @@
       "verified": "12"
     },
     "scripts": [
-        "scripts/RollPrompter.js"
-      ],
+      "scripts/RollPrompter.js"
+    ],
     "languages": [
         {
           "lang": "en",
@@ -24,9 +24,11 @@
           "path": "languages/en.json"
         }
       ],
+    "systems": ["warhammer40k"],
     "styles": [
         "styles/RollPrompter.css"
       ],
+    "url": "https://github.com/ieru00/impmal-RollPrompt/",
     "download": "https://github.com/ieru00/impmal-RollPrompt/raw/refs/heads/main/zipped/RollPrompter.zip",
     "manifest": "https://raw.githubusercontent.com/ieru00/impmal-RollPrompt/main/module.json"
   }

@@ -1,117 +1,104 @@
-const difficulties = [
-  { name: "Challenging", value: 0, special_name: "challenging" },
-  { name: "Routine", value: 20, special_name: "routine" },
-  { name: "Easy", value: 40, special_name: "easy" },
-  { name: "Very Easy", value: 60, special_name: "veryEasy" },
-  { name: "Difficult", value: -10, special_name: "difficult" },
-  { name: "Hard", value: -20, special_name: "hard" },
-  { name: "Very Hard", value: -30, special_name: "veryHard" },
-];
+const RollPrompter = {
+  DIFFICULTIES: [
+    { name: "Challenging", value: 0, special_name: "challenging" },
+    { name: "Routine", value: 20, special_name: "routine" },
+    { name: "Easy", value: 40, special_name: "easy" },
+    { name: "Very Easy", value: 60, special_name: "veryEasy" },
+    { name: "Difficult", value: -10, special_name: "difficult" },
+    { name: "Hard", value: -20, special_name: "hard" },
+    { name: "Very Hard", value: -30, special_name: "veryHard" },
+  ],
 
-const capitalizeFirstLetter = (string) =>
-  string.charAt(0).toUpperCase() + string.slice(1);
+  capitalizeFirstLetter(string) {
+    return string.charAt(0).toUpperCase() + string.slice(1);
+  },
 
-function createSkillSelectionDialog(actor) {
-  const skills = actor.system.skills;
-  const combinedSkillsArray = [];
-  const actorName = actor.name;
-  const actorImage = actor.img;
+  getActorOwners(actor) {
+    const owners = Object.keys(actor.ownership).filter(
+      (userId) => actor.ownership[userId] === 3
+    );
+    const gms = game.users.filter((user) => user.isGM).map((user) => user.id);
+    return [...owners, ...gms];
+  },
 
-  for (const skill in skills) {
-    combinedSkillsArray.push({ name: skill });
+  createSkillSelectionDialog(actor) {
+    const skills = actor.system.skills;
+    const combinedSkillsArray = [];
 
-    if (skills[skill].specialisations) {
-      skills[skill].specialisations.forEach((spec) => {
-        combinedSkillsArray.push({
-          name: `${skill}: ${capitalizeFirstLetter(spec.name)}`,
-          id: spec.id,
-          parentSkill: skill,
+    for (const skill in skills) {
+      combinedSkillsArray.push({ name: skill });
+
+      if (skills[skill].specialisations) {
+        skills[skill].specialisations.forEach((spec) => {
+          combinedSkillsArray.push({
+            name: `${skill}: ${this.capitalizeFirstLetter(spec.name)}`,
+            id: spec.id,
+            parentSkill: skill,
+          });
         });
-      });
+      }
     }
-  }
 
-  return combinedSkillsArray;
-}
+    return combinedSkillsArray;
+  },
 
-const sendChatMessage = (
-  actor,
-  skill,
-  difficultyValue,
-  difficultyName,
-  successLevel,
-  isPrivate
-) => {
-  const img = actor.img;
-  const actorName = actor.name;
-  const skillName = capitalizeFirstLetter(skill);
-  const difficultyText = `${capitalizeFirstLetter(difficultyName)}`;
-  const owners = getActorOwners(actor);
-  const uniqueWhisper = [...new Set([game.user.id, ...owners])];
+  sendChatMessage(actor, skill, difficultyValue, difficultyName, successLevel, isPrivate) {
+    const img = actor.img;
+    const actorName = actor.name;
+    const skillName = this.capitalizeFirstLetter(skill);
+    const difficultyText = `${this.capitalizeFirstLetter(difficultyName)}`;
+    const owners = this.getActorOwners(actor);
+    const uniqueWhisper = [...new Set([game.user.id, ...owners])];
 
-  const messageContent = `
-    <div class="chat-card">
-      <header class="card-header">
-        <img src="${img}" title="${actorName}" width="50" height="50"/>
-        <h3>${actorName}</h3>
-      </header>
-      <div class="card-content">
-        <p>Skill: ${skillName}</p>
-        <p>Difficulty: ${difficultyText}</p>
-        <p>Success Level: ${successLevel}</p>
-        <button class="roll-button" data-skill="${skill}" data-actor="${
-    actor.id
-  }" data-difficulty="${difficultyValue}" data-difficulty-name="${difficultyName}" data-success-level="${successLevel}" data-private="${isPrivate}" data-owners="${owners.join(
-    ","
-  )}" data-gms="${game.users
-    .filter((user) => user.isGM)
-    .map((user) => user.id)
-    .join(",")}" style="margin-top: 3px;">Roll: ${skillName}</button>
-      </div>
-    </div>`;
+    const messageContent = `
+      <div class="chat-card">
+        <header class="card-header">
+          <img src="${img}" title="${actorName}" width="50" height="50"/>
+          <h3>${actorName}</h3>
+        </header>
+        <div class="card-content">
+          <p>Skill: ${skillName}</p>
+          <p>Difficulty: ${difficultyText}</p>
+          <p>Success Level: ${successLevel}</p>
+          <button class="roll-button" data-skill="${skill}" data-actor="${actor.id}" 
+            data-difficulty="${difficultyValue}" data-difficulty-name="${difficultyName}" 
+            data-success-level="${successLevel}" data-private="${isPrivate}" 
+            data-owners="${owners.join(",")}" data-gms="${game.users
+              .filter((user) => user.isGM)
+              .map((user) => user.id)
+              .join(",")}" style="margin-top: 3px;">Roll: ${skillName}</button>
+        </div>
+      </div>`;
 
-  const chatData = {
-    user: game.user.id,
-    speaker: ChatMessage.getSpeaker({ actor: actor }),
-    content: messageContent,
-    whisper: isPrivate ? uniqueWhisper : [],
-  };
+    const chatData = {
+      user: game.user.id,
+      speaker: ChatMessage.getSpeaker({ actor: actor }),
+      content: messageContent,
+      whisper: isPrivate ? uniqueWhisper : [],
+    };
 
-  ChatMessage.create(chatData);
-};
+    ChatMessage.create(chatData);
+  },
 
-const getActorOwners = (actor) => {
-  const owners = Object.keys(actor.ownership).filter(
-    (userId) => actor.ownership[userId] === 3
-  ); // 3 indicates the owner permission
-  const gms = game.users.filter((user) => user.isGM).map((user) => user.id);
-  return [...owners, ...gms];
-};
-
-Hooks.on("renderSceneControls", (controls, html) => {
-  if (!game.user.isGM) return;
-
-  const button = $(`<li class="control-tool" title="Prompt for Rolls!">
-    <i class="fas fa-dice"></i>
-  </li>`);
-
-  let showAllActors = localStorage.getItem("showAllActors") === "true";
-  let dialogInstance = null;
-
-  const createDialogContent = (showAllActors) => {
+  createDialogContent(showAllActors) {
     const playerActors = canvas.tokens.placeables.filter(
       (token) => token.actor && token.actor.hasPlayerOwner
     );
+    const allSkills = game.impmal.config.skills;
+    
     let dialogContent = `
-      <div style="display: flex; justify-content: flex-start; align-items: center; margin-bottom: 10px;">
-        <button id="toggleButton" style="padding: 5px 10px; margin-right: 10px;">${
-          showAllActors ? "Go to Roll All Page" : "Go to Tokens Page"
-        }</button>
+      <div class="toggle-container">
+        <span class="toggle-label">Individual Actors</span>
+        <label class="toggle-switch">
+          <input type="checkbox" id="toggleButton" ${!showAllActors ? 'checked' : ''}>
+          <span class="toggle-slider"></span>
+        </label>
+        <span class="toggle-label">Prompt All</span>
       </div>
       <form style="display: flex; flex-wrap: wrap; overflow-x: auto; max-width: 100%;">`;
 
     const addDifficultyOptions = () => {
-      return difficulties
+      return this.DIFFICULTIES
         .map(
           (d) =>
             `<option value="${d.value}" data-special="${d.special_name}">${
@@ -125,8 +112,10 @@ Hooks.on("renderSceneControls", (controls, html) => {
       for (const token of playerActors) {
         const actor = token.actor;
         const tokenImg = actor.img;
-        const skills = createSkillSelectionDialog(actor);
+        const skills = this.createSkillSelectionDialog(actor);
+        
 
+        //Individual Token Dialog Content
         dialogContent += `
           <div style="flex: 1 1 200px; margin: 10px; border: 1px solid #ccc; padding: 10px; box-sizing: border-box;">
             ${
@@ -134,10 +123,12 @@ Hooks.on("renderSceneControls", (controls, html) => {
                 ? `<img src="${tokenImg}" alt="${actor.name}" style="width: 100px; height: 100px; display: block; margin: 0 auto;">`
                 : ""
             }
-            <label>${actor.name}</label>
+            <h3 style="text-align: center; margin: 5px 0;">${actor.name}</h3>
             <div style="margin-bottom: 10px;">
-              <label for="skills-${actor.id}">Skills:</label>
-              <select name="skills-${actor.id}">
+              <div style="margin-bottom: 5px;">
+                <label for="skills-${actor.id}">Skills:</label>
+              </div>
+              <select name="skills-${actor.id}" style="width: 100%;">
                 <option value="" disabled selected>(>',')>Select Skill<(','<)</option>
                 ${skills
                   .map(
@@ -148,204 +139,143 @@ Hooks.on("renderSceneControls", (controls, html) => {
               </select>
             </div>
             <div style="margin-bottom: 10px;">
-              <label for="difficulty-${actor.id}">Difficulty:</label>
-              <select name="difficulty-${actor.id}">
+              <div style="margin-bottom: 5px;">
+                <label for="difficulty-${actor.id}">Difficulty:</label>
+              </div>
+              <select name="difficulty-${actor.id}" style="width: 100%;">
                 ${addDifficultyOptions()}
               </select>
             </div>
             <div style="margin-bottom: 10px;">
-              <label>isPrivate?</label>
-              <input type="checkbox" name="isPrivate-${actor.id}">
+              <label>
+                <input type="checkbox" name="isPrivate-${actor.id}">
+                Private Roll?
+              </label>
             </div>
             <div style="margin-bottom: 10px;">
-              <label for="successLevel-${actor.id}">Success Level:</label>
-              <input type="number" name="successLevel-${
-                actor.id
-              }" value="0" style="width: 60px;" min="-9" max="99">
-              <button type="button" name="roll-${
-                actor.id
-              }" style="margin-top: 3px;">Roll</button>
+              <div style="margin-bottom: 5px;">
+                <label for="successLevel-${actor.id}">Success Level:</label>
+              </div>
+              <input type="number" class="spinner" name="successLevel-${actor.id}" value="0" min="-9" max="99">
+              <button type="button" name="roll-${actor.id}" style="margin-top: 3px;">Roll</button>
             </div>
           </div>`;
       }
     } else {
-      const allSkills = game.impmal.config.skills;
 
+      //Prompt All Dialog Content
       dialogContent += `
-        <div style="flex: 1 1 100%; margin: 10px; border: 1px solid #ccc; padding: 10px; box-sizing: border-box;">
-          <label>Roll All!</label>
-          <div style="margin-bottom: 10px;">
-            <label for="skills-all">Skills:</label>
-            <select name="skills-all">
-              <option value="" disabled selected>(>',')>Select Skill<(','<)</option>
-              ${Object.values(allSkills)
-                .map((skill) => `<option value="${skill}">${skill}</option>`)
-                .join("")}
-            </select>
+        <div style="display: flex; gap: 10px;">
+          <div style="flex: 2; border: 1px solid #ccc; padding: 10px; box-sizing: border-box;">
+            <h3 style="text-align: center; margin: 5px 0;">Prompt All!</h3>
+            <div style="margin-bottom: 10px;">
+              <div style="margin-bottom: 5px;">
+                <label for="skills-all">Skills:</label>
+              </div>
+              <select name="skills-all" style="width: 100%;">
+                <option value="" disabled selected>(>',')>Select Skill<(','<)</option>
+                ${Object.keys(allSkills)
+                  .map((skill) => `<option value="${skill}">${skill}</option>`)
+                  .join("")}
+              </select>
+            </div>
+            <div style="margin-bottom: 10px;">
+              <div style="margin-bottom: 5px;">
+                <label for="difficulty-all">Difficulty:</label>
+              </div>
+              <select name="difficulty-all" style="width: 100%;">
+                ${addDifficultyOptions()}
+              </select>
+            </div>
+            <div style="margin-bottom: 10px;">
+              <label>
+                <input type="checkbox" name="isPrivate-all">
+                Private Roll?
+              </label>
+            </div>
+            <div style="margin-bottom: 10px;">
+              <div style="margin-bottom: 5px;">
+                <label for="successLevel-all">Success Level:</label>
+              </div>
+              <input type="number" class="spinner" name="successLevel-all" value="0" min="-9" max="99">
+              <button type="button" id="prompt-all-button" style="margin-top: 3px;">Prompt All</button>
+            </div>
           </div>
-          <div style="margin-bottom: 10px;">
-            <label for="difficulty-all">Difficulty:</label>
-            <select name="difficulty-all">
-              ${addDifficultyOptions()}
-            </select>
-          </div>
-          <div style="margin-bottom: 10px;">
-            <label>isPrivate?</label>
-            <input type="checkbox" name="isPrivate-all">
-          </div>
-          <div style="margin-bottom: 10px;">
-            <label for="successLevel-all">Success Level:</label>
-            <input type="number" name="successLevel-all" value="0" style="width: 60px;" min="-9" max="99">
-            <button type="button" id="roll-all-button" style="margin-top: 3px;">Roll All</button>
+          <div style="flex: 1; border: 1px solid #ccc; padding: 10px; max-height: 300px; overflow-y: auto;">
+            <h3 style="text-align: center; margin: 5px 0;">Tokens</h3>
+            ${playerActors.map(token => `
+              <div style="margin-bottom: 5px;">
+                <label>
+                  <input type="checkbox" name="selected-token-${token.actor.id}" checked>
+                  ${token.actor.name}
+                </label>
+              </div>
+            `).join('')}
           </div>
         </div>`;
     }
     dialogContent += "</form>";
-
-    // Add event listeners for roll buttons
-    Hooks.once("renderDialog", (dialog, html) => {
-      html.find("button[name^='roll-']").click((event) => {
-        const actorId = event.target.name.split("-")[1];
-        const actor = game.actors.get(actorId);
-        const skill = html.find(`select[name='skills-${actorId}']`).val();
-        const skillId = html
-          .find(`select[name='skills-${actorId}'] option:selected`)
-          .data("id");
-        const difficultyValue = html
-          .find(`select[name='difficulty-${actorId}']`)
-          .val();
-        const difficultyName = html
-          .find(`select[name='difficulty-${actorId}'] option:selected`)
-          .text();
-        const successLevel = html
-          .find(`input[name='successLevel-${actorId}']`)
-          .val();
-        const isPrivate = html
-          .find(`input[name='isPrivate-${actorId}']`)
-          .prop("checked");
-
-        if (!skill) {
-          ui.notifications.warn(
-            `${actor.name} requires a skill to be selected before rolling.`
-          );
-          return;
-        }
-
-        sendChatMessage(
-          actor,
-          skill,
-          difficultyValue,
-          difficultyName,
-          successLevel,
-          isPrivate
-        );
-      });
-
-      html.find("#roll-all-button").click((event) => {
-        const skill = html.find("select[name='skills-all']").val();
-        const difficultyValue = html
-          .find("select[name='difficulty-all']")
-          .val();
-        const difficultyName = html
-          .find("select[name='difficulty-all'] option:selected")
-          .text();
-        const successLevel = html.find("input[name='successLevel-all']").val();
-        const isPrivate = html
-          .find("input[name='isPrivate-all']")
-          .prop("checked");
-
-        if (!skill) {
-          ui.notifications.warn(
-            "Please select a skill before rolling for all."
-          );
-          return;
-        }
-
-        const playerActors = canvas.tokens.placeables.filter(
-          (token) => token.actor && token.actor.hasPlayerOwner
-        );
-        playerActors.forEach((token) => {
-          const actor = token.actor;
-          sendChatMessage(
-            actor,
-            skill,
-            difficultyValue,
-            difficultyName,
-            successLevel,
-            isPrivate
-          );
-        });
-      });
-    });
-
     return dialogContent;
-  };
+  },
 
-  const createDialog = () => {
-    if (dialogInstance) {
-      dialogInstance.close().then(() => {
-        dialogInstance = null;
-        createNewDialog();
-      });
-    } else {
-      createNewDialog();
-    }
-  };
+  renderDialog(showAllActors, dialogInstance) {
+    const dialogContent = this.createDialogContent(showAllActors);
+    const self = this;
 
-  const createNewDialog = () => {
-    const dialogContent = createDialogContent(showAllActors);
-
-    const buttons = {
-      close: {
-        label: "Close",
-        callback: (html) => {
-          dialogInstance = null;
-        },
-      },
-    };
+    let buttons = {};
 
     if (showAllActors) {
-      buttons.close = { label: "Close", callback: () => {} }; // Do nothing on close, keep dialog open
-      buttons.promptAll = {
-        label: "Prompt All!",
-        callback: (html) => {
-          const formData = new FormData(html[0].querySelector("form"));
-          console.log("Form Data:", formData);
+      buttons = {
+        promptAll: {  
+          label: "Prompt All!",
+          callback: (html) => {
+            const formData = new FormData(html[0].querySelector("form"));
 
-          for (const entry of formData.entries()) {
-            console.log(entry[0], entry[1]);
-          }
-
-          const actorTokens = canvas.tokens.placeables.filter(
-            (token) => token.actor && token.actor.hasPlayerOwner
-          );
-          actorTokens.forEach((token) => {
-            const actor = token.actor;
-            const skill = formData.get(`skills-${actor.id}`);
-            const difficultyValue = formData.get(`difficulty-${actor.id}`);
-            const difficultyName = html
-              .find(`select[name='difficulty-${actor.id}'] option:selected`)
-              .text();
-            const successLevel = formData.get(`successLevel-${actor.id}`);
-            const isPrivate = formData.get(`isPrivate-${actor.id}`) === "on";
-
-            if (!skill) {
-              ui.notifications.warn(
-                `${actor.name} requires a skill to be selected before rolling.`
-              );
-              return;
-            }
-
-            sendChatMessage(
-              actor,
-              skill,
-              difficultyValue,
-              difficultyName,
-              successLevel,
-              isPrivate
+            const actorTokens = canvas.tokens.placeables.filter(
+              (token) => token.actor && token.actor.hasPlayerOwner
             );
-          });
+            actorTokens.forEach((token) => {
+              const actor = token.actor;
+              const skill = formData.get(`skills-${actor.id}`);
+              const difficultyValue = formData.get(`difficulty-${actor.id}`);
+              const difficultyName = html
+                .find(`select[name='difficulty-${actor.id}'] option:selected`)
+                .text();
+              const successLevel = formData.get(`successLevel-${actor.id}`);
+              const isPrivate = formData.get(`isPrivate-${actor.id}`) === "on";
+
+              if (!skill) {
+                ui.notifications.warn(
+                  `${actor.name} requires a skill to be selected before rolling.`
+                );
+                return;
+              }
+
+              self.sendChatMessage(
+                actor,
+                skill,
+                difficultyValue,
+                difficultyName,
+                successLevel,
+                isPrivate
+              );
+            });
+          },
         },
+        close: {
+          label: "Close",
+          callback: () => {}
+        }
+      };
+    } else {
+      // In the "Roll All" view, only show close button
+      buttons = {
+        close: {
+          label: "Close",
+          callback: (html) => {
+            dialogInstance = null;
+          }
+        }
       };
     }
 
@@ -373,30 +303,91 @@ Hooks.on("renderSceneControls", (controls, html) => {
           "max-height": "100vh",
           overflow: "auto",
         });
-    
-        $("#toggleButton").click(function () {
-          showAllActors = !showAllActors;
-          localStorage.setItem("showAllActors", showAllActors);
-          console.log("Toggle button clicked, showAllActors:", showAllActors);
-          createDialog(); // Recreate the dialog on toggle
+
+        // Toggle between the two prompt pages, no toggle switch in wh40k css for right now.
+html.find("#toggleButton").click(function() {
+  globalShowAllActors = !this.checked;  // Inverted the logic here
+  localStorage.setItem("showAllActors", globalShowAllActors);
+  console.log("Toggle button clicked, showAllActors:", globalShowAllActors);
+  if (globalDialogInstance?.rendered) {
+    globalDialogInstance.close();
+  }
+  globalDialogInstance = null;
+  globalDialogInstance = RollPrompter.renderDialog(globalShowAllActors, null);
+});
+
+        // Add event listeners for roll buttons
+        html.find("button[name^='roll-']").click((event) => {
+          const actorId = event.target.name.split("-")[1];
+          const actor = game.actors.get(actorId);
+          const skill = html.find(`select[name='skills-${actorId}']`).val();
+          const difficultyValue = html.find(`select[name='difficulty-${actorId}']`).val();
+          const difficultyName = html.find(`select[name='difficulty-${actorId}'] option:selected`).text();
+          const successLevel = html.find(`input[name='successLevel-${actorId}']`).val();
+          const isPrivate = html.find(`input[name='isPrivate-${actorId}']`).prop("checked");
+
+          if (!skill) {
+            ui.notifications.warn(`${actor.name} requires a skill to be selected before rolling.`);
+            return;
+          }
+
+          self.sendChatMessage(actor, skill, difficultyValue, difficultyName, successLevel, isPrivate);
+        });
+
+        html.find("#prompt-all-button").click((event) => {
+          const skill = html.find("select[name='skills-all']").val();
+          const difficultyValue = html.find("select[name='difficulty-all']").val();
+          const difficultyName = html.find("select[name='difficulty-all'] option:selected").text();
+          const successLevel = html.find("input[name='successLevel-all']").val();
+          const isPrivate = html.find("input[name='isPrivate-all']").prop("checked");
+        
+          if (!skill) {
+            ui.notifications.warn("Please select a skill before rolling for all.");
+            return;
+          }
+        
+          const playerActors = canvas.tokens.placeables.filter(
+            (token) => token.actor && token.actor.hasPlayerOwner
+          ).filter(token => {
+            // Only include tokens that are checked in the list
+            return html.find(`input[name="selected-token-${token.actor.id}"]`).prop("checked");
+          });
+        
+          playerActors.forEach((token) => {
+            const actor = token.actor;
+            self.sendChatMessage(actor, skill, difficultyValue, difficultyName, successLevel, isPrivate);
+          });
         });
       }
     });
-    
-    
 
     dialogInstance.render(true);
-  };
+    return dialogInstance;
+  }
+};
+
+let globalDialogInstance = null;
+let globalShowAllActors = localStorage.getItem("showAllActors") === "true";
+
+Hooks.on("renderSceneControls", (controls, html) => {
+  if (!game.user.isGM) return;
+
+  const button = $(`<li class="control-tool" title="Prompt for Rolls!">
+    <i class="fas fa-dice"></i>
+  </li>`);
 
   button.click(() => {
-    console.log("Button clicked, dialogInstance:", dialogInstance);
-    createDialog();
+    console.log("Button clicked, dialogInstance:", globalDialogInstance);
+    if (globalDialogInstance?.rendered) {
+      globalDialogInstance.close();
+    }
+    globalDialogInstance = null;
+    globalDialogInstance = RollPrompter.renderDialog(globalShowAllActors, null);
   });
 
   html.find(".main-controls").append(button);
 });
 
-// Handle chat button click events
 Hooks.on("renderChatMessage", (message, html, data) => {
   html.find(".roll-button").click((event) => {
     const button = $(event.currentTarget);
@@ -406,9 +397,7 @@ Hooks.on("renderChatMessage", (message, html, data) => {
     const difficultyName = button.data("difficultyName");
     const successLevel = button.data("successLevel");
     const isPrivate = button.data("private");
-    const owners = button.data("owners")
-      ? button.data("owners").split(",")
-      : [];
+    const owners = button.data("owners") ? button.data("owners").split(",") : [];
     const gms = button.data("gms") ? button.data("gms").split(",") : [];
 
     const userIsGM = gms.includes(game.user.id);
@@ -416,20 +405,35 @@ Hooks.on("renderChatMessage", (message, html, data) => {
 
     if (userIsGM || userIsOwner) {
       const actor = game.actors.get(actorId);
-      const skills = createSkillSelectionDialog(actor);
-      const selectedSkill = skills.find((s) => s.name === skill);
-
-      const skillSetup = {
-        itemId: selectedSkill?.id || undefined,
-        name: undefined,
-        key: selectedSkill?.parentSkill || selectedSkill?.name,
-      };
+      const allSkills = game.impmal.config.skills;
+      const skills = RollPrompter.createSkillSelectionDialog(actor);
+      
+      // First check if it's a skill from the Prompt All section
+      const isPromptAllSkill = Object.values(allSkills).includes(skill);
+      
+      let skillSetup;
+      
+      if (isPromptAllSkill) {
+        skillSetup = {
+          itemId: undefined,
+          name: undefined,
+          key: skill
+        };
+      } else {
+        // Handle individual skills as before
+        const selectedSkill = skills.find((s) => s.name === skill);
+        skillSetup = {
+          itemId: selectedSkill?.id || undefined,
+          name: undefined,
+          key: selectedSkill?.parentSkill || selectedSkill?.name,
+        };
+      }
 
       const optionSetup = {
         title: {},
         fields: {
           difficulty:
-            difficulties.find((diff) => diff.value == difficultyValue)
+            RollPrompter.DIFFICULTIES.find((diff) => diff.value == difficultyValue)
               ?.special_name || "unknown",
           rollMode: isPrivate ? "gmroll" : "publicroll",
           SL: isNaN(Number(successLevel)) ? 0 : Number(successLevel),
