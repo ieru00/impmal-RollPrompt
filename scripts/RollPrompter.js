@@ -131,7 +131,7 @@ Hooks.on("renderSceneControls", (controls, html) => {
           <div style="flex: 1 1 200px; margin: 10px; border: 1px solid #ccc; padding: 10px; box-sizing: border-box;">
             ${
               tokenImg
-                ? `<img src="${tokenImg}" alt="${actor.name}" style="width: 50px; height: 50px; display: block; margin: 0 auto;">`
+                ? `<img src="${tokenImg}" alt="${actor.name}" style="width: 100px; height: 100px; display: block; margin: 0 auto;">`
                 : ""
             }
             <label>${actor.name}</label>
