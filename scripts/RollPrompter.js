@@ -9,6 +9,12 @@ const RollPrompter = {
     { name: "Very Hard", value: -30, special_name: "veryHard" },
   ],
 
+  ROLLMODE: [
+    { name: "Public", value: "publicroll" },
+    { name: "Private GM", value: "gmroll"},
+    { name: "Blind GM", value: "blindroll" },
+  ],
+
   capitalizeFirstLetter(string) {
     return string.charAt(0).toUpperCase() + string.slice(1);
   },
@@ -42,12 +48,13 @@ const RollPrompter = {
     return combinedSkillsArray;
   },
 
-  sendChatMessage(actor, skill, difficultyValue, difficultyName, successLevel, isPrivate) {
+  sendChatMessage(actor, skill, difficultyValue, difficultyName, successLevel, rollMode) {
     const img = actor.img;
     const actorName = actor.name;
     const skillName = this.capitalizeFirstLetter(skill);
     const difficultyText = `${this.capitalizeFirstLetter(difficultyName)}`;
     const owners = this.getActorOwners(actor);
+    const isPrivate = rollMode !== "publicroll";
     const uniqueWhisper = [...new Set([game.user.id, ...owners])];
 
     const messageContent = `
@@ -62,7 +69,7 @@ const RollPrompter = {
           <p>Success Level: ${successLevel}</p>
           <button class="roll-button" data-skill="${skill}" data-actor="${actor.id}" 
             data-difficulty="${difficultyValue}" data-difficulty-name="${difficultyName}" 
-            data-success-level="${successLevel}" data-private="${isPrivate}" 
+            data-success-level="${successLevel}" data-rollmode="${rollMode}" 
             data-owners="${owners.join(",")}" data-gms="${game.users
               .filter((user) => user.isGM)
               .map((user) => user.id)
@@ -80,11 +87,59 @@ const RollPrompter = {
     ChatMessage.create(chatData);
   },
 
+  getAllSpecialisations() {
+    const playerActors = canvas.tokens.placeables
+      .filter((token) => token.actor && token.actor.hasPlayerOwner)
+      .map(token => token.actor);
+    
+    const allSkillsAndSpecs = [];
+    const allSkills = game.impmal.config.skills;
+    
+    for (const skill in allSkills) {
+      allSkillsAndSpecs.push({ 
+        name: skill,
+        isSpecialisation: false,
+        parentSkill: null
+      });
+    }
+    
+    playerActors.forEach(actor => {
+      const skills = actor.system.skills;
+      for (const skillName in skills) {
+        if (skills[skillName].specialisations) {
+          skills[skillName].specialisations.forEach((spec) => {
+            // Check if this specialisation is already in the array
+            const existingSpecIndex = allSkillsAndSpecs.findIndex(
+              s => s.isSpecialisation && s.name === `${skillName}: ${this.capitalizeFirstLetter(spec.name)}`
+            );
+            
+            // Only add if it doesn't exist yet
+            if (existingSpecIndex === -1) {
+              allSkillsAndSpecs.push({
+                name: `${skillName}: ${this.capitalizeFirstLetter(spec.name)}`,
+                id: spec.id,
+                isSpecialisation: true,
+                parentSkill: skillName
+              });
+            }
+          });
+        }
+      }
+    });
+    
+    allSkillsAndSpecs.sort((a, b) => {
+      return a.name.localeCompare(b.name);
+    });
+    
+    return allSkillsAndSpecs;
+  },
+
   createDialogContent(showAllActors) {
     const playerActors = canvas.tokens.placeables.filter(
       (token) => token.actor && token.actor.hasPlayerOwner
     );
     const allSkills = game.impmal.config.skills;
+    const allSkillsAndSpecs = this.getAllSpecialisations();
     
     let dialogContent = `
       <div class="toggle-container">
@@ -104,6 +159,15 @@ const RollPrompter = {
             `<option value="${d.value}" data-special="${d.special_name}">${
               d.name
             } ${d.value >= 0 ? "+" : ""}${d.value}</option>`
+        )
+        .join("");
+    };
+
+    const addRollModeOptions = () => {
+      return this.ROLLMODE
+        .map(
+          (mode) =>
+            `<option value="${mode.value}">${mode.name}</option>`
         )
         .join("");
     };
@@ -147,10 +211,12 @@ const RollPrompter = {
               </select>
             </div>
             <div style="margin-bottom: 10px;">
-              <label>
-                <input type="checkbox" name="isPrivate-${actor.id}">
-                Private Roll?
-              </label>
+              <div style="margin-bottom: 5px;">
+                <label for="rollMode-${actor.id}">Roll Mode:</label>
+              </div>
+              <select name="rollMode-${actor.id}" style="width: 100%;">
+                ${addRollModeOptions()}
+              </select>
             </div>
             <div style="margin-bottom: 10px;">
               <div style="margin-bottom: 5px;">
@@ -174,8 +240,14 @@ const RollPrompter = {
               </div>
               <select name="skills-all" style="width: 100%;">
                 <option value="" disabled selected>(>',')>Select Skill<(','<)</option>
-                ${Object.keys(allSkills)
-                  .map((skill) => `<option value="${skill}">${skill}</option>`)
+                ${allSkillsAndSpecs
+                  .map((skillObj) => {
+                    if (skillObj.isSpecialisation) {
+                      return `<option value="${skillObj.name}" data-is-spec="true" data-parent-skill="${skillObj.parentSkill}" data-id="${skillObj.id || ''}">${skillObj.name}</option>`;
+                    } else {
+                      return `<option value="${skillObj.name}">${skillObj.name}</option>`;
+                    }
+                  })
                   .join("")}
               </select>
             </div>
@@ -188,10 +260,12 @@ const RollPrompter = {
               </select>
             </div>
             <div style="margin-bottom: 10px;">
-              <label>
-                <input type="checkbox" name="isPrivate-all">
-                Private Roll?
-              </label>
+              <div style="margin-bottom: 5px;">
+                <label for="rollMode-all">Roll Mode:</label>
+              </div>
+              <select name="rollMode-all" style="width: 100%;">
+                ${addRollModeOptions()}
+              </select>
             </div>
             <div style="margin-bottom: 10px;">
               <div style="margin-bottom: 5px;">
@@ -242,7 +316,7 @@ const RollPrompter = {
                 .find(`select[name='difficulty-${actor.id}'] option:selected`)
                 .text();
               const successLevel = formData.get(`successLevel-${actor.id}`);
-              const isPrivate = formData.get(`isPrivate-${actor.id}`) === "on";
+              const rollMode = formData.get(`rollMode-${actor.id}`);
 
               if (!skill) {
                 ui.notifications.warn(
@@ -257,7 +331,7 @@ const RollPrompter = {
                 difficultyValue,
                 difficultyName,
                 successLevel,
-                isPrivate
+                rollMode
               );
             });
           },
@@ -268,7 +342,6 @@ const RollPrompter = {
         }
       };
     } else {
-      // In the "Roll All" view, only show close button
       buttons = {
         close: {
           label: "Close",
@@ -306,7 +379,7 @@ const RollPrompter = {
 
         // Toggle between the two prompt pages, no toggle switch in wh40k css for right now.
 html.find("#toggleButton").click(function() {
-  globalShowAllActors = !this.checked;  // Inverted the logic here
+  globalShowAllActors = !this.checked;
   localStorage.setItem("showAllActors", globalShowAllActors);
   console.log("Toggle button clicked, showAllActors:", globalShowAllActors);
   if (globalDialogInstance?.rendered) {
@@ -316,7 +389,6 @@ html.find("#toggleButton").click(function() {
   globalDialogInstance = RollPrompter.renderDialog(globalShowAllActors, null);
 });
 
-        // Add event listeners for roll buttons
         html.find("button[name^='roll-']").click((event) => {
           const actorId = event.target.name.split("-")[1];
           const actor = game.actors.get(actorId);
@@ -324,22 +396,26 @@ html.find("#toggleButton").click(function() {
           const difficultyValue = html.find(`select[name='difficulty-${actorId}']`).val();
           const difficultyName = html.find(`select[name='difficulty-${actorId}'] option:selected`).text();
           const successLevel = html.find(`input[name='successLevel-${actorId}']`).val();
-          const isPrivate = html.find(`input[name='isPrivate-${actorId}']`).prop("checked");
+          const rollMode = html.find(`select[name='rollMode-${actorId}']`).val();
 
           if (!skill) {
             ui.notifications.warn(`${actor.name} requires a skill to be selected before rolling.`);
             return;
           }
 
-          self.sendChatMessage(actor, skill, difficultyValue, difficultyName, successLevel, isPrivate);
+          self.sendChatMessage(actor, skill, difficultyValue, difficultyName, successLevel, rollMode);
         });
 
         html.find("#prompt-all-button").click((event) => {
-          const skill = html.find("select[name='skills-all']").val();
+          const selectedOption = html.find("select[name='skills-all'] option:selected");
+          const skill = selectedOption.val();
+          const isSpecialisation = selectedOption.data("isSpec") === true;
+          const parentSkill = selectedOption.data("parentSkill");
+          const specId = selectedOption.data("id");
           const difficultyValue = html.find("select[name='difficulty-all']").val();
           const difficultyName = html.find("select[name='difficulty-all'] option:selected").text();
           const successLevel = html.find("input[name='successLevel-all']").val();
-          const isPrivate = html.find("input[name='isPrivate-all']").prop("checked");
+          const rollMode = html.find("select[name='rollMode-all']").val();
         
           if (!skill) {
             ui.notifications.warn("Please select a skill before rolling for all.");
@@ -349,13 +425,23 @@ html.find("#toggleButton").click(function() {
           const playerActors = canvas.tokens.placeables.filter(
             (token) => token.actor && token.actor.hasPlayerOwner
           ).filter(token => {
-            // Only include tokens that are checked in the list
             return html.find(`input[name="selected-token-${token.actor.id}"]`).prop("checked");
           });
         
           playerActors.forEach((token) => {
             const actor = token.actor;
-            self.sendChatMessage(actor, skill, difficultyValue, difficultyName, successLevel, isPrivate);
+            
+            if (isSpecialisation && parentSkill) {
+              const actorSkills = self.createSkillSelectionDialog(actor);
+              const hasSpecialisation = actorSkills.some(s => s.name === skill);
+              
+              if (!hasSpecialisation) {
+                self.sendChatMessage(actor, parentSkill, difficultyValue, difficultyName, successLevel, rollMode);
+                return;
+              }
+            }
+            
+            self.sendChatMessage(actor, skill, difficultyValue, difficultyName, successLevel, rollMode);
           });
         });
       }
@@ -396,7 +482,7 @@ Hooks.on("renderChatMessage", (message, html, data) => {
     const difficultyValue = button.data("difficulty");
     const difficultyName = button.data("difficultyName");
     const successLevel = button.data("successLevel");
-    const isPrivate = button.data("private");
+    const rollMode = button.data("rollmode");
     const owners = button.data("owners") ? button.data("owners").split(",") : [];
     const gms = button.data("gms") ? button.data("gms").split(",") : [];
 
@@ -408,25 +494,45 @@ Hooks.on("renderChatMessage", (message, html, data) => {
       const allSkills = game.impmal.config.skills;
       const skills = RollPrompter.createSkillSelectionDialog(actor);
       
-      // First check if it's a skill from the Prompt All section
-      const isPromptAllSkill = Object.values(allSkills).includes(skill);
-      
       let skillSetup;
       
-      if (isPromptAllSkill) {
-        skillSetup = {
-          itemId: undefined,
-          name: undefined,
-          key: skill
-        };
-      } else {
-        // Handle individual skills as before
+      if (skill.includes(":")) {
+        const parentSkill = skill.split(":")[0].trim();
+        
         const selectedSkill = skills.find((s) => s.name === skill);
-        skillSetup = {
-          itemId: selectedSkill?.id || undefined,
-          name: undefined,
-          key: selectedSkill?.parentSkill || selectedSkill?.name,
-        };
+        
+        if (selectedSkill) {
+          // Actor has this specialisation
+          skillSetup = {
+            itemId: selectedSkill.id || undefined,
+            name: undefined,
+            key: selectedSkill.parentSkill || parentSkill,
+          };
+        } else {
+          // Actor doesn't have this specialisation, fall back to parent skill
+          skillSetup = {
+            itemId: undefined,
+            name: undefined,
+            key: parentSkill
+          };
+        }
+      } else {
+        // Regular skill (not a specialisation)
+        const selectedSkill = skills.find((s) => s.name === skill);
+        
+        if (selectedSkill) {
+          skillSetup = {
+            itemId: selectedSkill.id || undefined,
+            name: undefined,
+            key: selectedSkill.parentSkill || selectedSkill.name,
+          };
+        } else {
+          skillSetup = {
+            itemId: undefined,
+            name: undefined,
+            key: skill
+          };
+        }
       }
 
       const optionSetup = {
@@ -435,7 +541,7 @@ Hooks.on("renderChatMessage", (message, html, data) => {
           difficulty:
             RollPrompter.DIFFICULTIES.find((diff) => diff.value == difficultyValue)
               ?.special_name || "unknown",
-          rollMode: isPrivate ? "gmroll" : "publicroll",
+          rollMode: rollMode || "publicroll",
           SL: isNaN(Number(successLevel)) ? 0 : Number(successLevel),
         },
       };
