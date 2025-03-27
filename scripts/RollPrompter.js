@@ -9,6 +9,12 @@ const RollPrompter = {
     { name: "Very Hard", value: -30, special_name: "veryHard" },
   ],
 
+  ROLLMODE: [
+    { name: "Public", value: "publicroll" },
+    { name: "Private GM", value: "gmroll"},
+    { name: "Blind GM", value: "blindroll" },
+  ],
+
   capitalizeFirstLetter(string) {
     return string.charAt(0).toUpperCase() + string.slice(1);
   },
@@ -42,12 +48,13 @@ const RollPrompter = {
     return combinedSkillsArray;
   },
 
-  sendChatMessage(actor, skill, difficultyValue, difficultyName, successLevel, isPrivate) {
+  sendChatMessage(actor, skill, difficultyValue, difficultyName, successLevel, rollMode) {
     const img = actor.img;
     const actorName = actor.name;
     const skillName = this.capitalizeFirstLetter(skill);
     const difficultyText = `${this.capitalizeFirstLetter(difficultyName)}`;
     const owners = this.getActorOwners(actor);
+    const isPrivate = rollMode !== "publicroll";
     const uniqueWhisper = [...new Set([game.user.id, ...owners])];
 
     const messageContent = `
@@ -62,7 +69,7 @@ const RollPrompter = {
           <p>Success Level: ${successLevel}</p>
           <button class="roll-button" data-skill="${skill}" data-actor="${actor.id}" 
             data-difficulty="${difficultyValue}" data-difficulty-name="${difficultyName}" 
-            data-success-level="${successLevel}" data-private="${isPrivate}" 
+            data-success-level="${successLevel}" data-rollmode="${rollMode}" 
             data-owners="${owners.join(",")}" data-gms="${game.users
               .filter((user) => user.isGM)
               .map((user) => user.id)
@@ -108,6 +115,15 @@ const RollPrompter = {
         .join("");
     };
 
+    const addRollModeOptions = () => {
+      return this.ROLLMODE
+        .map(
+          (mode) =>
+            `<option value="${mode.value}">${mode.name}</option>`
+        )
+        .join("");
+    };
+
     if (showAllActors) {
       for (const token of playerActors) {
         const actor = token.actor;
@@ -147,10 +163,12 @@ const RollPrompter = {
               </select>
             </div>
             <div style="margin-bottom: 10px;">
-              <label>
-                <input type="checkbox" name="isPrivate-${actor.id}">
-                Private Roll?
-              </label>
+              <div style="margin-bottom: 5px;">
+                <label for="rollMode-${actor.id}">Roll Mode:</label>
+              </div>
+              <select name="rollMode-${actor.id}" style="width: 100%;">
+                ${addRollModeOptions()}
+              </select>
             </div>
             <div style="margin-bottom: 10px;">
               <div style="margin-bottom: 5px;">
@@ -188,10 +206,12 @@ const RollPrompter = {
               </select>
             </div>
             <div style="margin-bottom: 10px;">
-              <label>
-                <input type="checkbox" name="isPrivate-all">
-                Private Roll?
-              </label>
+              <div style="margin-bottom: 5px;">
+                <label for="rollMode-all">Roll Mode:</label>
+              </div>
+              <select name="rollMode-all" style="width: 100%;">
+                ${addRollModeOptions()}
+              </select>
             </div>
             <div style="margin-bottom: 10px;">
               <div style="margin-bottom: 5px;">
@@ -242,7 +262,7 @@ const RollPrompter = {
                 .find(`select[name='difficulty-${actor.id}'] option:selected`)
                 .text();
               const successLevel = formData.get(`successLevel-${actor.id}`);
-              const isPrivate = formData.get(`isPrivate-${actor.id}`) === "on";
+              const rollMode = formData.get(`rollMode-${actor.id}`);
 
               if (!skill) {
                 ui.notifications.warn(
@@ -257,7 +277,7 @@ const RollPrompter = {
                 difficultyValue,
                 difficultyName,
                 successLevel,
-                isPrivate
+                rollMode
               );
             });
           },
@@ -306,7 +326,7 @@ const RollPrompter = {
 
         // Toggle between the two prompt pages, no toggle switch in wh40k css for right now.
 html.find("#toggleButton").click(function() {
-  globalShowAllActors = !this.checked;  // Inverted the logic here
+  globalShowAllActors = !this.checked;
   localStorage.setItem("showAllActors", globalShowAllActors);
   console.log("Toggle button clicked, showAllActors:", globalShowAllActors);
   if (globalDialogInstance?.rendered) {
@@ -324,14 +344,14 @@ html.find("#toggleButton").click(function() {
           const difficultyValue = html.find(`select[name='difficulty-${actorId}']`).val();
           const difficultyName = html.find(`select[name='difficulty-${actorId}'] option:selected`).text();
           const successLevel = html.find(`input[name='successLevel-${actorId}']`).val();
-          const isPrivate = html.find(`input[name='isPrivate-${actorId}']`).prop("checked");
+          const rollMode = html.find(`select[name='rollMode-${actorId}']`).val();
 
           if (!skill) {
             ui.notifications.warn(`${actor.name} requires a skill to be selected before rolling.`);
             return;
           }
 
-          self.sendChatMessage(actor, skill, difficultyValue, difficultyName, successLevel, isPrivate);
+          self.sendChatMessage(actor, skill, difficultyValue, difficultyName, successLevel, rollMode);
         });
 
         html.find("#prompt-all-button").click((event) => {
@@ -339,7 +359,7 @@ html.find("#toggleButton").click(function() {
           const difficultyValue = html.find("select[name='difficulty-all']").val();
           const difficultyName = html.find("select[name='difficulty-all'] option:selected").text();
           const successLevel = html.find("input[name='successLevel-all']").val();
-          const isPrivate = html.find("input[name='isPrivate-all']").prop("checked");
+          const rollMode = html.find("select[name='rollMode-all']").val();
         
           if (!skill) {
             ui.notifications.warn("Please select a skill before rolling for all.");
@@ -349,13 +369,12 @@ html.find("#toggleButton").click(function() {
           const playerActors = canvas.tokens.placeables.filter(
             (token) => token.actor && token.actor.hasPlayerOwner
           ).filter(token => {
-            // Only include tokens that are checked in the list
             return html.find(`input[name="selected-token-${token.actor.id}"]`).prop("checked");
           });
         
           playerActors.forEach((token) => {
             const actor = token.actor;
-            self.sendChatMessage(actor, skill, difficultyValue, difficultyName, successLevel, isPrivate);
+            self.sendChatMessage(actor, skill, difficultyValue, difficultyName, successLevel, rollMode);
           });
         });
       }
@@ -396,7 +415,7 @@ Hooks.on("renderChatMessage", (message, html, data) => {
     const difficultyValue = button.data("difficulty");
     const difficultyName = button.data("difficultyName");
     const successLevel = button.data("successLevel");
-    const isPrivate = button.data("private");
+    const rollMode = button.data("rollmode");
     const owners = button.data("owners") ? button.data("owners").split(",") : [];
     const gms = button.data("gms") ? button.data("gms").split(",") : [];
 
@@ -408,7 +427,6 @@ Hooks.on("renderChatMessage", (message, html, data) => {
       const allSkills = game.impmal.config.skills;
       const skills = RollPrompter.createSkillSelectionDialog(actor);
       
-      // First check if it's a skill from the Prompt All section
       const isPromptAllSkill = Object.values(allSkills).includes(skill);
       
       let skillSetup;
@@ -420,7 +438,6 @@ Hooks.on("renderChatMessage", (message, html, data) => {
           key: skill
         };
       } else {
-        // Handle individual skills as before
         const selectedSkill = skills.find((s) => s.name === skill);
         skillSetup = {
           itemId: selectedSkill?.id || undefined,
@@ -435,7 +452,7 @@ Hooks.on("renderChatMessage", (message, html, data) => {
           difficulty:
             RollPrompter.DIFFICULTIES.find((diff) => diff.value == difficultyValue)
               ?.special_name || "unknown",
-          rollMode: isPrivate ? "gmroll" : "publicroll",
+          rollMode: rollMode || "publicroll",
           SL: isNaN(Number(successLevel)) ? 0 : Number(successLevel),
         },
       };
