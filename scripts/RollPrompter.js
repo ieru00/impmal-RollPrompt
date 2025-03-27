@@ -87,11 +87,59 @@ const RollPrompter = {
     ChatMessage.create(chatData);
   },
 
+  getAllSpecialisations() {
+    const playerActors = canvas.tokens.placeables
+      .filter((token) => token.actor && token.actor.hasPlayerOwner)
+      .map(token => token.actor);
+    
+    const allSkillsAndSpecs = [];
+    const allSkills = game.impmal.config.skills;
+    
+    for (const skill in allSkills) {
+      allSkillsAndSpecs.push({ 
+        name: skill,
+        isSpecialisation: false,
+        parentSkill: null
+      });
+    }
+    
+    playerActors.forEach(actor => {
+      const skills = actor.system.skills;
+      for (const skillName in skills) {
+        if (skills[skillName].specialisations) {
+          skills[skillName].specialisations.forEach((spec) => {
+            // Check if this specialisation is already in the array
+            const existingSpecIndex = allSkillsAndSpecs.findIndex(
+              s => s.isSpecialisation && s.name === `${skillName}: ${this.capitalizeFirstLetter(spec.name)}`
+            );
+            
+            // Only add if it doesn't exist yet
+            if (existingSpecIndex === -1) {
+              allSkillsAndSpecs.push({
+                name: `${skillName}: ${this.capitalizeFirstLetter(spec.name)}`,
+                id: spec.id,
+                isSpecialisation: true,
+                parentSkill: skillName
+              });
+            }
+          });
+        }
+      }
+    });
+    
+    allSkillsAndSpecs.sort((a, b) => {
+      return a.name.localeCompare(b.name);
+    });
+    
+    return allSkillsAndSpecs;
+  },
+
   createDialogContent(showAllActors) {
     const playerActors = canvas.tokens.placeables.filter(
       (token) => token.actor && token.actor.hasPlayerOwner
     );
     const allSkills = game.impmal.config.skills;
+    const allSkillsAndSpecs = this.getAllSpecialisations();
     
     let dialogContent = `
       <div class="toggle-container">
@@ -192,8 +240,14 @@ const RollPrompter = {
               </div>
               <select name="skills-all" style="width: 100%;">
                 <option value="" disabled selected>(>',')>Select Skill<(','<)</option>
-                ${Object.keys(allSkills)
-                  .map((skill) => `<option value="${skill}">${skill}</option>`)
+                ${allSkillsAndSpecs
+                  .map((skillObj) => {
+                    if (skillObj.isSpecialisation) {
+                      return `<option value="${skillObj.name}" data-is-spec="true" data-parent-skill="${skillObj.parentSkill}" data-id="${skillObj.id || ''}">${skillObj.name}</option>`;
+                    } else {
+                      return `<option value="${skillObj.name}">${skillObj.name}</option>`;
+                    }
+                  })
                   .join("")}
               </select>
             </div>
@@ -288,7 +342,6 @@ const RollPrompter = {
         }
       };
     } else {
-      // In the "Roll All" view, only show close button
       buttons = {
         close: {
           label: "Close",
@@ -336,7 +389,6 @@ html.find("#toggleButton").click(function() {
   globalDialogInstance = RollPrompter.renderDialog(globalShowAllActors, null);
 });
 
-        // Add event listeners for roll buttons
         html.find("button[name^='roll-']").click((event) => {
           const actorId = event.target.name.split("-")[1];
           const actor = game.actors.get(actorId);
@@ -355,7 +407,11 @@ html.find("#toggleButton").click(function() {
         });
 
         html.find("#prompt-all-button").click((event) => {
-          const skill = html.find("select[name='skills-all']").val();
+          const selectedOption = html.find("select[name='skills-all'] option:selected");
+          const skill = selectedOption.val();
+          const isSpecialisation = selectedOption.data("isSpec") === true;
+          const parentSkill = selectedOption.data("parentSkill");
+          const specId = selectedOption.data("id");
           const difficultyValue = html.find("select[name='difficulty-all']").val();
           const difficultyName = html.find("select[name='difficulty-all'] option:selected").text();
           const successLevel = html.find("input[name='successLevel-all']").val();
@@ -374,6 +430,17 @@ html.find("#toggleButton").click(function() {
         
           playerActors.forEach((token) => {
             const actor = token.actor;
+            
+            if (isSpecialisation && parentSkill) {
+              const actorSkills = self.createSkillSelectionDialog(actor);
+              const hasSpecialisation = actorSkills.some(s => s.name === skill);
+              
+              if (!hasSpecialisation) {
+                self.sendChatMessage(actor, parentSkill, difficultyValue, difficultyName, successLevel, rollMode);
+                return;
+              }
+            }
+            
             self.sendChatMessage(actor, skill, difficultyValue, difficultyName, successLevel, rollMode);
           });
         });
@@ -427,23 +494,45 @@ Hooks.on("renderChatMessage", (message, html, data) => {
       const allSkills = game.impmal.config.skills;
       const skills = RollPrompter.createSkillSelectionDialog(actor);
       
-      const isPromptAllSkill = Object.values(allSkills).includes(skill);
-      
       let skillSetup;
       
-      if (isPromptAllSkill) {
-        skillSetup = {
-          itemId: undefined,
-          name: undefined,
-          key: skill
-        };
-      } else {
+      if (skill.includes(":")) {
+        const parentSkill = skill.split(":")[0].trim();
+        
         const selectedSkill = skills.find((s) => s.name === skill);
-        skillSetup = {
-          itemId: selectedSkill?.id || undefined,
-          name: undefined,
-          key: selectedSkill?.parentSkill || selectedSkill?.name,
-        };
+        
+        if (selectedSkill) {
+          // Actor has this specialisation
+          skillSetup = {
+            itemId: selectedSkill.id || undefined,
+            name: undefined,
+            key: selectedSkill.parentSkill || parentSkill,
+          };
+        } else {
+          // Actor doesn't have this specialisation, fall back to parent skill
+          skillSetup = {
+            itemId: undefined,
+            name: undefined,
+            key: parentSkill
+          };
+        }
+      } else {
+        // Regular skill (not a specialisation)
+        const selectedSkill = skills.find((s) => s.name === skill);
+        
+        if (selectedSkill) {
+          skillSetup = {
+            itemId: selectedSkill.id || undefined,
+            name: undefined,
+            key: selectedSkill.parentSkill || selectedSkill.name,
+          };
+        } else {
+          skillSetup = {
+            itemId: undefined,
+            name: undefined,
+            key: skill
+          };
+        }
       }
 
       const optionSetup = {
