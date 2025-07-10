@@ -458,6 +458,8 @@ let globalShowAllActors = localStorage.getItem("showAllActors") === "true";
 Hooks.on("renderSceneControls", (controls, html) => {
   if (!game.user.isGM) return;
 
+  if (game.release.generation > 12) return;
+
   const button = $(`<li class="control-tool" title="Prompt for Rolls!">
     <i class="fas fa-dice"></i>
   </li>`);
@@ -472,6 +474,26 @@ Hooks.on("renderSceneControls", (controls, html) => {
   });
 
   html.find(".main-controls").append(button);
+});
+
+Hooks.on("getSceneControlButtons", (controls) => {
+  if (!game.user.isGM) return;
+
+  controls["tokens"].tools["rollPrompter"] = {
+            name: 'rollPrompter',
+            title: 'Prompt for Rolls!',
+            icon: 'fas fa-dice',
+            button: true,
+            onClick: () => {
+              console.log("Button clicked, dialogInstance:", globalDialogInstance);
+              if (globalDialogInstance?.rendered) {
+                globalDialogInstance.close();
+              }
+              globalDialogInstance = null;
+              globalDialogInstance = RollPrompter.renderDialog(globalShowAllActors, null);
+            },
+            visible: game.user.isGM,
+        }
 });
 
 Hooks.on("renderChatMessage", (message, html, data) => {
