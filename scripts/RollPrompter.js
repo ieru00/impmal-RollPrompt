@@ -568,6 +568,8 @@ Hooks.on("renderChatMessage", (message, html, data) => {
         },
       };
 
+      if (game.release.generation > 12) delete optionSetup.title;
+
       actor.setupSkillTest(skillSetup, optionSetup, true);
     } else {
       ui.notifications.warn(
