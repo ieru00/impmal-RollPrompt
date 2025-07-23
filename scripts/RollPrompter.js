@@ -1,4 +1,16 @@
 const RollPrompter = {
+  // Helper function to get tokens in V13 compatible way
+  getTokens() {
+    if (canvas.tokens.objects && typeof canvas.tokens.objects.values === 'function') {
+      return Array.from(canvas.tokens.objects.values());
+    } else if (canvas.tokens.objects && canvas.tokens.objects.children) {
+      return canvas.tokens.objects.children;
+    } else if (canvas.tokens.placeables) {
+      return canvas.tokens.placeables;
+    }
+    return [];
+  },
+
   DIFFICULTIES: [
     { name: "Challenging", value: 0, special_name: "challenging" },
     { name: "Routine", value: 20, special_name: "routine" },
@@ -88,7 +100,7 @@ const RollPrompter = {
   },
 
   getAllSpecialisations() {
-    const playerActors = canvas.tokens.placeables
+    const playerActors = this.getTokens()
       .filter((token) => token.actor && token.actor.hasPlayerOwner)
       .map(token => token.actor);
     
@@ -135,7 +147,7 @@ const RollPrompter = {
   },
 
   createDialogContent(showAllActors) {
-    const playerActors = canvas.tokens.placeables.filter(
+    const playerActors = this.getTokens().filter(
       (token) => token.actor && token.actor.hasPlayerOwner
     );
     const allSkills = game.impmal.config.skills;
@@ -305,7 +317,7 @@ const RollPrompter = {
           callback: (html) => {
             const formData = new FormData(html[0].querySelector("form"));
 
-            const actorTokens = canvas.tokens.placeables.filter(
+            const actorTokens = RollPrompter.getTokens().filter(
               (token) => token.actor && token.actor.hasPlayerOwner
             );
             actorTokens.forEach((token) => {
@@ -422,7 +434,7 @@ html.find("#toggleButton").click(function() {
             return;
           }
         
-          const playerActors = canvas.tokens.placeables.filter(
+          const playerActors = RollPrompter.getTokens().filter(
             (token) => token.actor && token.actor.hasPlayerOwner
           ).filter(token => {
             return html.find(`input[name="selected-token-${token.actor.id}"]`).prop("checked");
@@ -449,30 +461,76 @@ html.find("#toggleButton").click(function() {
 
     dialogInstance.render(true);
     return dialogInstance;
+  },
+
+  addSceneControlButton() {
+    // Remove existing button if it exists
+    $("#rollprompter-control").remove();
+    
+    // Create the button with V13 structure
+    const button = $(`<li>
+      <button type="button" id="rollprompter-control" class="control ui-control layer icon fa-solid fa-dice" 
+              role="tab" data-action="control" data-control="rollprompter" 
+              data-tooltip="" aria-pressed="false" aria-label="Prompt for Rolls!"></button>
+    </li>`);
+
+    // Bind click event to the button inside the li
+    button.find('button').on('click', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (globalDialogInstance?.rendered) {
+        globalDialogInstance.close();
+      }
+      globalDialogInstance = null;
+      globalDialogInstance = RollPrompter.renderDialog(globalShowAllActors, null);
+    });
+
+    // Target the layers menu specifically (first menu in scene-controls)
+    let targetElement = null;
+    let location = "";
+    
+    // Look for the layers menu specifically
+    if ($("#scene-controls-layers").length > 0) {
+      targetElement = $("#scene-controls-layers");
+      location = "#scene-controls-layers";
+    } else if ($("#scene-controls").children().first().length > 0) {
+      targetElement = $("#scene-controls").children().first();
+      location = "#scene-controls first child";
+    } else if ($("#scene-controls").length > 0) {
+      targetElement = $("#scene-controls");
+      location = "#scene-controls";
+    }
+    
+    if (targetElement && targetElement.length > 0) {
+      targetElement.append(button);
+      return true;
+    } else {
+      console.warn("RollPrompter: Could not find suitable location for scene control button");
+      return false;
+    }
   }
 };
 
 let globalDialogInstance = null;
 let globalShowAllActors = localStorage.getItem("showAllActors") === "true";
 
-Hooks.on("renderSceneControls", (controls, html) => {
-  if (!game.user.isGM) return;
-
-  const button = $(`<li class="control-tool" title="Prompt for Rolls!">
-    <i class="fas fa-dice"></i>
-  </li>`);
-
-  button.click(() => {
-    console.log("Button clicked, dialogInstance:", globalDialogInstance);
-    if (globalDialogInstance?.rendered) {
-      globalDialogInstance.close();
-    }
-    globalDialogInstance = null;
-    globalDialogInstance = RollPrompter.renderDialog(globalShowAllActors, null);
-  });
-
-  html.find(".main-controls").append(button);
+Hooks.once("ready", () => {
+  if (game.user.isGM) {
+    setTimeout(() => {
+      RollPrompter.addSceneControlButton();
+    }, 2000);
+  }
 });
+
+// Also try when canvas is ready
+Hooks.on("canvasReady", () => {
+  if (game.user.isGM) {
+    setTimeout(() => {
+      RollPrompter.addSceneControlButton();
+    }, 500);
+  }
+});
+
 
 Hooks.on("renderChatMessage", (message, html, data) => {
   html.find(".roll-button").click((event) => {
@@ -505,38 +563,28 @@ Hooks.on("renderChatMessage", (message, html, data) => {
           // Actor has this specialisation
           skillSetup = {
             itemId: selectedSkill.id || undefined,
-            name: undefined,
+            name: skill,
             key: selectedSkill.parentSkill || parentSkill,
           };
         } else {
           // Actor doesn't have this specialisation, fall back to parent skill
           skillSetup = {
             itemId: undefined,
-            name: undefined,
+            name: parentSkill,
             key: parentSkill
           };
         }
       } else {
         // Regular skill (not a specialisation)
-        const selectedSkill = skills.find((s) => s.name === skill);
-        
-        if (selectedSkill) {
-          skillSetup = {
-            itemId: selectedSkill.id || undefined,
-            name: undefined,
-            key: selectedSkill.parentSkill || selectedSkill.name,
-          };
-        } else {
-          skillSetup = {
-            itemId: undefined,
-            name: undefined,
-            key: skill
-          };
-        }
+        skillSetup = {
+          itemId: undefined,
+          name: undefined,
+          key: skill
+        };
       }
 
       const optionSetup = {
-        title: {},
+        title: `${skill.charAt(0).toUpperCase() + skill.slice(1)}`,
         fields: {
           difficulty:
             RollPrompter.DIFFICULTIES.find((diff) => diff.value == difficultyValue)
@@ -546,7 +594,13 @@ Hooks.on("renderChatMessage", (message, html, data) => {
         },
       };
 
-      actor.setupSkillTest(skillSetup, optionSetup, true);
+      // setupSkillTest returns a Promise, handle it properly
+      actor.setupSkillTest(skillSetup, optionSetup, true).then(result => {
+        console.log("Roll completed successfully:", result);
+      }).catch(error => {
+        console.error("Roll failed:", error);
+        ui.notifications.error(`Roll failed: ${error.message}`);
+      });
     } else {
       ui.notifications.warn(
         "You do not have permission to roll for this actor."
